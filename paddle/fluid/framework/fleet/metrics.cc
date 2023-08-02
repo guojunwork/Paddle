@@ -136,7 +136,7 @@ void BasicAucCalculator::add_mask_data(const float* d_pred,
   }
   if (platform::is_gpu_place(place_mask) || platform::is_xpu_place(place_mask)) {
     h_mask.resize(batch_size);
-    SyncCopyD2H(h_mask.data(), d_label, batch_size);
+    SyncCopyD2H(h_mask.data(), d_mask, batch_size);
     add_mask = h_mask.data();
   }
   std::lock_guard<std::mutex> lock(_table_mutex);

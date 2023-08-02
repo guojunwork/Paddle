@@ -80,26 +80,39 @@ __global__ void CopyKeysKernel(unsigned long long* src_keys,
   }
   int thread_id = ncores * cluster_id() + cid;
   int nthreads = ncores * cluster_num();
-  __local__ long long local_len[slot_num + 1];
-  GM2LM(len, local_len, (slot_num + 1) * sizeof(long long));
 
-  __global_ptr__ unsigned long long* local_keys[slot_num];
-  GM2LM(src_keys, local_keys,
-        slot_num * sizeof(__global_ptr__ unsigned long long*));
+  // __local__ long long local_len[200];
+
+  //__local__ long long local_len[slot_num + 1];
+  __shared__ long long slot_lens[BoxWrapperKernel::MAX_SLOT_SIZE + 1];
+  __shared__ __global_ptr__ unsigned long long* slot_keys[BoxWrapperKernel::MAX_SLOT_SIZE];
+  for (int i = cid; i <= slot_num; i += ncores) {
+    if (i <= slot_num) {
+      GM2SM(&len[i], &slot_lens[i], sizeof(long long));
+    }
+    if (i < slot_num) {
+      GM2SM(&src_keys[i], &slot_keys[i], sizeof(__global_ptr__ unsigned long long*));
+    }
+  }
+  sync_cluster();
+  //GM2LM(len, local_len, (slot_num + 1) * sizeof(long long));
+
+  //__global_ptr__ unsigned long long* local_keys[slot_num];
+  //GM2LM(src_keys, local_keys, slot_num * sizeof(__global_ptr__ unsigned long long*));
 
   for (int i = thread_id; i < slot_num; i += nthreads) {
     // max core local memory = 8KB
-    int slot_len = local_len[i + 1] - local_len[i];
+    int slot_len = slot_lens[i + 1] - slot_lens[i];
     // int read_len = min(slot_len, 1024);
     int read_len = 100;
-    int dest_offset = local_len[i];
+    int dest_offset = slot_lens[i];
     __local__ unsigned long long local_slot_keys[read_len];
     __local__ uint32_t local_slot_keys_uint32[read_len];
     __local__ int local_slot_uint32[read_len];
 
     for (int k = 0; k < slot_len; k += read_len) {
       int real_read_len = min(read_len, slot_len - k);
-      GM2LM(local_keys[i] + k, local_slot_keys,
+      GM2LM(slot_keys[i] + k, local_slot_keys,
             real_read_len * sizeof(unsigned long long));
       for (int m = 0; m < real_read_len; m++) {
           local_slot_keys_uint32[m] = (uint32_t)local_slot_keys[m];
@@ -125,6 +138,7 @@ void BoxWrapperKernel::CopyKeys(const paddle::platform::Place& place,
   unsigned long long* o_keys =
       reinterpret_cast<unsigned long long*>(origin_keys);
   const long long* c_len = (const long long*)gpu_len;
+  CHECK(slot_num <= BoxWrapperKernel::MAX_SLOT_SIZE);
   CopyKeysKernel<<<2, 64, stream>>>(o_keys, total_keys, c_len, slot_num, total_len, key2slots);
   xpu_wait(stream);
 }

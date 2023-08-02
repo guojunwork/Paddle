@@ -26,6 +26,7 @@ void GetFeatureInfo(boxps::FeaturePullOffset &pull_info,
     size_t feature_pull_size, boxps::FeaturePushOffset &push_info,
     size_t feature_push_size, int embedx_dim, int expand_embed_dim,
     float pull_embedx_scale);
+
 void CopyKeys(const paddle::platform::Place& place,
                             uint64_t** origin_keys, uint32_t* total_keys,
                             const int64_t* xpu_len, int slot_num,
@@ -54,6 +55,9 @@ void CopyForPush(
     const int* total_dims,
     const int skip_offset,
     const int* key2slot);
+
+public:
+  const static int MAX_SLOT_SIZE = 10240;
 
 private:
   size_t feature_pull_size_ = 0;
