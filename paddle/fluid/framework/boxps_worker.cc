@@ -1367,6 +1367,7 @@ void BoxPSWorker::TrainFiles() {
       }
     }
 #endif
+    dev_ctx_->Wait();
     AddAucMonitor(thread_scope_, place_);
 
     accum_num += batch_size;
